@@ -21,24 +21,26 @@ Antes de ejecutar el script, asegúrate de tener instalados los siguientes requi
 2. **Crear el venv en el folder Project1OS**:
 
    ```sh
-   Project1OS> python -m venv venv
+   python -m venv venv
 
 3. **Activa el entorno virtual**
+   
    Windows
 
    ```sh
    .\venv\Scripts\activate
-
+   ```
    macOS/Linux
-
    ```sh
    venv/bin/activate
 
 4. **Instalar dependencias**
+   ```sh
    pip install -r requirements.txt
 
 5. **Entrar al folder project y ejecutar**
-   python dataload.py [OPCIONES -s, -m and nothing] -f "C:\Users\nicolas\Desktop\Sistemas Operativos\Project1OS\datasets"
+   ```sh
+   python dataload.py [OPCIONES -s, -m or nothing] -f "C:\Users\nicolas\Desktop\Sistemas Operativos\Project1OS\datasets"
 
 
 ## DESCRIPCIÓN
