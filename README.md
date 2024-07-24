@@ -1,9 +1,9 @@
 # PROYECTO 1 SISTEMAS OPERATIVOS 
 
 Integrantes:
-SAMUEL ACOSTA ARISTIZABAL
-DAVID ALBERTO CUADROS MARIÑO
-NICOLAS TOVAR ALMANZA
+- SAMUEL ACOSTA ARISTIZABAL
+- DAVID ALBERTO CUADROS MARIÑO
+- NICOLAS TOVAR ALMANZA
 
 ## ACTIVIDADES
 
@@ -18,11 +18,27 @@ dataload – Lector de datos.
 Antes de ejecutar el script, asegúrate de tener instalados los siguientes requisitos:
 
 1. **Python 3.x**: Puedes descargar Python desde [python.org](https://www.python.org/downloads/).
-2. **Dependencias**: Instala las dependencias necesarias ejecutando el siguiente comando en tu terminal:
+2. **Crear el venv en el folder Project1OS**:
 
    ```sh
+   Project1OS> python -m venv venv
+
+3. **Activa el entorno virtual**
+   Windows
+
+   ```sh
+   .\venv\Scripts\activate
+
+   macOS/Linux
+
+   ```sh
+   venv/bin/activate
+
+4. **Instalar dependencias**
    pip install -r requirements.txt
-   python dataload.py [OPCIONES] -f FOLDER
+
+5. **Entrar al folder project y ejecutar**
+   python dataload.py [OPCIONES -s, -m and nothing] -f "C:\Users\nicolas\Desktop\Sistemas Operativos\Project1OS\datasets"
 
 
 ## DESCRIPCIÓN
