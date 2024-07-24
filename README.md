@@ -28,16 +28,17 @@ Antes de ejecutar el script, asegúrate de tener instalados los siguientes requi
 
    ```sh
    .\venv\Scripts\activate
-
+   ```
    macOS/Linux
-
    ```sh
    venv/bin/activate
 
-4. **Instalar dependencias**
+5. **Instalar dependencias**
+   ```sh
    pip install -r requirements.txt
 
-5. **Entrar al folder project y ejecutar**
+7. **Entrar al folder project y ejecutar**
+   ```sh
    python dataload.py [OPCIONES -s, -m and nothing] -f "C:\Users\nicolas\Desktop\Sistemas Operativos\Project1OS\datasets"
 
 
