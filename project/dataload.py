@@ -67,7 +67,7 @@ def read_files_in_parallel(folder, mode):
 
 def print_end(mode, start_time_program, end_time_program, file_paths, start_times, end_times, durations):
     table = Table(title="Resumen de carga de archivos")
-    table.add_column("Archivo", justify="right", style="cyan", no_wrap=True)
+    table.add_column("Archivo", justify="left", style="cyan", no_wrap=True)
     table.add_column("Hora de inicio", style="magenta")
     table.add_column("Hora de finalización", style="magenta")
     table.add_column("Duración (s)", style="green")
