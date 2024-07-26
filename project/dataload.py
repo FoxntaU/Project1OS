@@ -5,7 +5,10 @@ from rich import print
 from rich.table import Table
 import argparse
 import pandas as pd
- 
+import multiprocessing
+import psutil
+import platform
+
 
 def read_files(file_path):
     print(f"Reading file: {file_path}")
@@ -22,8 +25,9 @@ def read_files(file_path):
     duration = end_time - start_time
     return data, duration
 
+
 def read_files_sequentially(folder):
-    print(f"Leyendo los archivos en [bold cyan] sequentially [/bold cyan] mode")
+    print(f"\nLeyendo los archivos en [bold cyan] sequentially [/bold cyan] mode")
     start_time_program = time.time()
     
     file_paths = [os.path.join(folder, file) for file in os.listdir(folder) if file.endswith('.csv')]
@@ -55,17 +59,26 @@ def read_files_sequentially(folder):
     print_end("sequentially", start_time_program, end_time_program, file_paths, start_times, end_times, durations)
         
     
-def read_files_in_parallel(folder, mode):
+def read_files_in_same_core(folder):
     
-    print(f"Leyendo los archivos en [bold cyan]{mode}[/bold cyan] mode")
+    print(f"\nLeyendo los archivos en [bold cyan] same core [/bold cyan] mode")
 
-    def same_core():
-        pass
+def read_files_in_multi_core(folder):
 
-    def multi_core():
-        pass
+    print(f"\nLeyendo los archivos en [bold cyan] multi core [/bold cyan] mode")
+
+
+def mostrar_informacion_sistema():
+    print(f"[bold cyan]Tipo de procesador:[/bold cyan] {platform.processor()}")
+    print(f"[bold cyan]Cantidad de memoria RAM:[/bold cyan] {psutil.virtual_memory().total / (1024 ** 3):.2f} GB")
+    print(f"[bold cyan]Sistema operativo:[/bold cyan] {platform.system()} {platform.release()}")
+ 
+
 
 def print_end(mode, start_time_program, end_time_program, file_paths, start_times, end_times, durations):
+    print("\n")
+    print("[bold]Información del sistema[/bold]")
+    mostrar_informacion_sistema()
     table = Table(title="Resumen de carga de archivos")
     table.add_column("Archivo", justify="left", style="cyan", no_wrap=True)
     table.add_column("Hora de inicio", style="magenta")
@@ -108,12 +121,16 @@ def main():
         sys.exit(1)
 
     if args.same_core:
-        read_files_in_parallel(args.folder, mode='same_core')
+        read_files_in_same_core(args.folder)
     elif args.multi_core:
-        read_files_in_parallel(args.folder, mode='multi_core')
+        read_files_in_multi_core(args.folder)
     else:
         read_files_sequentially(args.folder)
         
 
 if __name__ == "__main__":
     main()
+
+
+# Ejecutar el script
+# python dataload.py [OPCIONES -s, -m or nothing] -f "C:\Users\nicolas\Desktop\Sistemas Operativos\Project1OS\datasets"
