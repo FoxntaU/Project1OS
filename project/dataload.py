@@ -11,7 +11,7 @@ import platform
 
 
 def read_files(file_path):
-    print(f"Reading file: {file_path}")
+    print(f"Leyendo archivo: {file_path}")
     start_time = time.time()
     try:
         data = pd.read_csv(file_path, encoding='latin1')
@@ -26,16 +26,10 @@ def read_files(file_path):
     return data, duration
 
 
-def read_files_sequentially(folder):
+def read_files_sequentially(file_paths):
     print(f"\nLeyendo los archivos en [bold cyan] sequentially [/bold cyan] mode")
     start_time_program = time.time()
-    
-    file_paths = [os.path.join(folder, file) for file in os.listdir(folder) if file.endswith('.csv')]
-    
-    if not file_paths:
-        print("[bold red] Error: [/bold red] No se encontraron arcchivos csv en la carpeta especifica.")
-        sys.exit(1)
-    
+
     data_list = []
     durations = []
     start_times = []
@@ -58,13 +52,43 @@ def read_files_sequentially(folder):
     
     print_end("sequentially", start_time_program, end_time_program, file_paths, start_times, end_times, durations)
         
-    
-def read_files_in_same_core(folder):
-    
+
+def check_cpu_affinity():
+    p = psutil.Process(os.getpid())
+    affinity = p.cpu_affinity()
+    print(f"El proceso está asignado a los núcleos: {affinity}")
+
+def read_files_in_same_core(file_paths):
     print(f"\nLeyendo los archivos en [bold cyan] same core [/bold cyan] mode")
+    start_time_program = time.time()
+    p = psutil.Process(os.getpid()) 
+    # Asignar el proceso a un solo core
+    p.cpu_affinity([0])
+    check_cpu_affinity()
 
-def read_files_in_multi_core(folder):
+    data_list = []
+    durations = []
+    start_times = []
+    end_times = []
+    
+    for i, file_path in enumerate(file_paths):
+        if i == 0:
+            start_time_first_file = time.time()
+            start_times.append(start_time_first_file)
+        else:
+            start_times.append(end_times[-1])
+    
+        data, duration = read_files(file_path)
+        if data is not None:
+            data_list.append(data)
+        durations.append(duration)
+        end_times.append(time.time())
+        
+    end_time_program = time.time()
+    
+    print_end("same core", start_time_program, end_time_program, file_paths, start_times, end_times, durations)
 
+def read_files_in_multi_core(file_paths):
     print(f"\nLeyendo los archivos en [bold cyan] multi core [/bold cyan] mode")
 
 
@@ -72,7 +96,7 @@ def mostrar_informacion_sistema():
     print(f"[bold cyan]Tipo de procesador:[/bold cyan] {platform.processor()}")
     print(f"[bold cyan]Cantidad de memoria RAM:[/bold cyan] {psutil.virtual_memory().total / (1024 ** 3):.2f} GB")
     print(f"[bold cyan]Sistema operativo:[/bold cyan] {platform.system()} {platform.release()}")
- 
+    print(f"[bold cyan]Numero de CPUs:[/bold cyan] {multiprocessing.cpu_count()}")
 
 
 def print_end(mode, start_time_program, end_time_program, file_paths, start_times, end_times, durations):
@@ -120,12 +144,18 @@ def main():
         print("[bold red]Error:[/bold red]  No se pueden usar las opciones -s y -m al mismo tiempo.")
         sys.exit(1)
 
+    file_paths = [os.path.join(args.folder, file) for file in os.listdir(args.folder) if file.endswith('.csv')]
+    
+    if not file_paths:
+        print("[bold red] Error: [/bold red] No se encontraron archivos csv en la carpeta especifica.")
+        sys.exit(1)
+
     if args.same_core:
-        read_files_in_same_core(args.folder)
+        read_files_in_same_core(file_paths)
     elif args.multi_core:
-        read_files_in_multi_core(args.folder)
+        read_files_in_multi_core(file_paths)
     else:
-        read_files_sequentially(args.folder)
+        read_files_sequentially(file_paths)
         
 
 if __name__ == "__main__":
