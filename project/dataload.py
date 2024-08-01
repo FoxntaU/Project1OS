@@ -18,12 +18,13 @@ def read_files(file_path):
     except pd.errors.EmptyDataError:
         print(f"[bold red]Error:[/bold red] El archivo {file_path} está vacío o no tiene columnas.")
         data = None
-        duration = 0
-        return data, duration 
+        end_time = time.time()
+        duration = end_time - start_time
+        return data, start_time, end_time, duration
     
     end_time = time.time()
     duration = end_time - start_time
-    return data, duration
+    return data, start_time, end_time, duration
 
 
 def read_files_sequentially(file_paths):
@@ -35,18 +36,15 @@ def read_files_sequentially(file_paths):
     start_times = []
     end_times = []
     
-    for i, file_path in enumerate(file_paths):
-        if i == 0:
-            start_time_first_file = time.time()
-            start_times.append(start_time_first_file)
-        else:
-            start_times.append(end_times[-1])
-    
-        data, duration = read_files(file_path)
+    for file_path in file_paths:
+        data, start_time, end_time, duration = read_files(file_path)
         if data is not None:
             data_list.append(data)
-        durations.append(duration)
-        end_times.append(time.time())
+            start_times.append(start_time)
+            end_times.append(end_time)
+            durations.append(duration)
+        else: 
+            print(f"[bold red]Error:[/bold red] El archivo {file_path} no pudo ser leído.")
         
     end_time_program = time.time()
     
@@ -61,8 +59,8 @@ def check_cpu_affinity():
 def read_files_in_same_core(file_paths):
     print(f"\nLeyendo los archivos en [bold cyan] same core [/bold cyan] mode")
     start_time_program = time.time()
-    p = psutil.Process(os.getpid()) 
     # Asignar el proceso a un solo core
+    p = psutil.Process(os.getpid())
     p.cpu_affinity([0])
     check_cpu_affinity()
 
@@ -70,26 +68,51 @@ def read_files_in_same_core(file_paths):
     durations = []
     start_times = []
     end_times = []
-    
-    for i, file_path in enumerate(file_paths):
-        if i == 0:
-            start_time_first_file = time.time()
-            start_times.append(start_time_first_file)
-        else:
-            start_times.append(end_times[-1])
-    
-        data, duration = read_files(file_path)
+
+    with multiprocessing.Pool() as pool:
+        # Set the affinity of the worker processes to a single core
+        worker_pool = pool._pool
+        for worker in worker_pool:
+            psutil.Process(worker.pid).cpu_affinity([0])
+        
+        results = pool.map(read_files, file_paths)
+
+    for i, (data, start_time, end_time, duration) in enumerate(results):
         if data is not None:
             data_list.append(data)
+        start_times.append(start_time)
+        end_times.append(end_time)
         durations.append(duration)
-        end_times.append(time.time())
-        
+
     end_time_program = time.time()
     
     print_end("same core", start_time_program, end_time_program, file_paths, start_times, end_times, durations)
 
 def read_files_in_multi_core(file_paths):
     print(f"\nLeyendo los archivos en [bold cyan] multi core [/bold cyan] mode")
+    start_time_program = time.time()
+    p = psutil.Process(os.getpid())
+    p.cpu_affinity(list(range(psutil.cpu_count()))) # Asignar el proceso a todos los cores
+    check_cpu_affinity()
+
+    data_list = []
+    durations = []
+    start_times = []
+    end_times = []
+
+    with multiprocessing.Pool() as pool:
+        results = pool.map(read_files, file_paths)
+
+    for i, (data, start_time, end_time, duration) in enumerate(results):
+        if data is not None:
+            data_list.append(data)
+        start_times.append(start_time)
+        end_times.append(end_time)
+        durations.append(duration)
+
+    end_time_program = time.time()
+
+    print_end("multi core", start_time_program, end_time_program, file_paths, start_times, end_times, durations)
 
 
 def mostrar_informacion_sistema():
