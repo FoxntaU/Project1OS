@@ -1,6 +1,6 @@
 import os
 import sys
-import time
+from datetime import datetime
 from rich import print
 from rich.table import Table
 import argparse
@@ -9,27 +9,26 @@ import multiprocessing
 import psutil
 import platform
 
-
 def read_files(file_path):
     print(f"Leyendo archivo: {file_path}")
-    start_time = time.time()
+    start_time = datetime.now()
     try:
         data = pd.read_csv(file_path, encoding='latin1')
     except pd.errors.EmptyDataError:
         print(f"[bold red]Error:[/bold red] El archivo {file_path} está vacío o no tiene columnas.")
         data = None
-        end_time = time.time()
-        duration = end_time - start_time
+        end_time = datetime.now()
+        duration = (end_time - start_time).total_seconds()
         return data, start_time, end_time, duration
     
-    end_time = time.time()
-    duration = end_time - start_time
+    end_time = datetime.now()
+    duration = (end_time - start_time).total_seconds()
     return data, start_time, end_time, duration
 
 
 def read_files_sequentially(file_paths):
     print(f"\nLeyendo los archivos en [bold cyan] sequentially [/bold cyan] mode")
-    start_time_program = time.time()
+    start_time_program = datetime.now()
 
     data_list = []
     durations = []
@@ -46,9 +45,10 @@ def read_files_sequentially(file_paths):
         else: 
             print(f"[bold red]Error:[/bold red] El archivo {file_path} no pudo ser leído.")
         
-    end_time_program = time.time()
+    end_time_program = datetime.now()
     
     print_end("sequentially", start_time_program, end_time_program, file_paths, start_times, end_times, durations)
+    save_to_csv("sequentially", start_time_program, end_time_program, file_paths, start_times, end_times, durations)
         
 
 def check_cpu_affinity():
@@ -58,7 +58,7 @@ def check_cpu_affinity():
 
 def read_files_in_same_core(file_paths):
     print(f"\nLeyendo los archivos en [bold cyan] same core [/bold cyan] mode")
-    start_time_program = time.time()
+    start_time_program = datetime.now()
     # Asignar el proceso a un solo core
     p = psutil.Process(os.getpid())
     p.cpu_affinity([0])
@@ -84,13 +84,14 @@ def read_files_in_same_core(file_paths):
         end_times.append(end_time)
         durations.append(duration)
 
-    end_time_program = time.time()
+    end_time_program = datetime.now()
     
     print_end("same core", start_time_program, end_time_program, file_paths, start_times, end_times, durations)
+    save_to_csv("same_core", start_time_program, end_time_program, file_paths, start_times, end_times, durations)
 
 def read_files_in_multi_core(file_paths):
     print(f"\nLeyendo los archivos en [bold cyan] multi core [/bold cyan] mode")
-    start_time_program = time.time()
+    start_time_program = datetime.now()
     p = psutil.Process(os.getpid())
     p.cpu_affinity(list(range(psutil.cpu_count()))) # Asignar el proceso a todos los cores
     check_cpu_affinity()
@@ -110,9 +111,10 @@ def read_files_in_multi_core(file_paths):
         end_times.append(end_time)
         durations.append(duration)
 
-    end_time_program = time.time()
+    end_time_program = datetime.now()
 
     print_end("multi core", start_time_program, end_time_program, file_paths, start_times, end_times, durations)
+    save_to_csv("multi_core", start_time_program, end_time_program, file_paths, start_times, end_times, durations)
 
 
 def mostrar_informacion_sistema():
@@ -135,21 +137,47 @@ def print_end(mode, start_time_program, end_time_program, file_paths, start_time
     for i, file_path in enumerate(file_paths):
         table.add_row(
             os.path.basename(file_path),
-            time.strftime("%H:%M:%S", time.localtime(start_times[i])),
-            time.strftime("%H:%M:%S", time.localtime(end_times[i])),
-            f"{durations[i]:.2f}"
+            start_times[i].strftime("%H:%M:%S.%f"),
+            end_times[i].strftime("%H:%M:%S.%f"),
+            f"{durations[i]:.6f}"
         )
 
-    start_time_str = time.strftime("%H:%M:%S", time.localtime(start_time_program))
-    end_time_str = time.strftime("%H:%M:%S", time.localtime(end_time_program))
-    duration_total = end_time_program - start_time_program
-    duration_total_str = time.strftime("%M:%S", time.gmtime(duration_total))
+    start_time_str = start_times[0].strftime("%H:%M:%S.%f")
+    end_time_str = end_times[-1].strftime("%H:%M:%S.%f")
+    duration_total = (end_time_program - start_time_program).total_seconds()
+    duration_total_str = f"{duration_total:.6f}"
 
-    print(table)
+    
     print(f"\n[bold cyan]Modo:[/bold cyan] {mode}")
-    print(f"[bold magenta]Hora de inicio del programa:[/bold magenta] {start_time_str}")
-    print(f"[bold magenta]Hora de finalización del programa:[/bold magenta] {end_time_str}")
-    print(f"[bold green]Tiempo total del proceso:[/bold green] {duration_total_str}")
+    print(f"[bold magenta]Hora de inicio del programa:[/bold magenta] {start_time_program.strftime('%H:%M:%S.%f')}")
+    print(f"[bold magenta]Hora de inicio de la carga del primer archivo:[/bold magenta] {start_time_str}")
+    print(f"[bold magenta]Hora de finalización de la carga del último archivo:[/bold magenta] {end_time_str}")
+    print(f"[bold magenta]Hora de finalización del programa:[/bold magenta] {end_time_program.strftime('%H:%M:%S.%f')}")
+    print(table)
+    print(f"[bold green]Tiempo total del proceso:[/bold green] {duration_total_str} segundos")
+
+def save_to_csv(mode, start_time_program, end_time_program, file_paths, start_times, end_times, durations):
+    # Preparar datos para el archivo CSV
+    data = {
+        "Archivo": [os.path.basename(fp) for fp in file_paths],
+        "Hora de inicio": [st.strftime("%H:%M:%S.%f") for st in start_times],
+        "Hora de finalización": [et.strftime("%H:%M:%S.%f") for et in end_times],
+        "Duración (s)": [f"{duration:.6f}" for duration in durations]
+    }
+    df = pd.DataFrame(data)
+    
+    # Agregar información adicional
+    df["Modo"] = mode
+    df["Hora de inicio del programa"] = start_time_program.strftime("%H:%M:%S.%f")
+    df["Hora de inicio de la carga del primer archivo"] = start_times[0].strftime("%H:%M:%S.%f")
+    df["Hora de finalización de la carga del último archivo"] = end_times[-1].strftime("%H:%M:%S.%f")
+    df["Hora de finalización del programa"] = end_time_program.strftime("%H:%M:%S.%f")
+    df["Tiempo total del proceso (s)"] = f"{(end_time_program - start_time_program).total_seconds():.6f}"
+
+    # Guardar el DataFrame en un archivo CSV
+    output_file = f"{mode}_summary.csv"
+    df.to_csv(output_file, index=False)
+    print(f"\n[bold green]Resumen guardado en:[/bold green] {output_file}\n")
 
     
 def main():
@@ -183,7 +211,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-# Ejecutar el script
-# python dataload.py [OPCIONES -s, -m or nothing] -f "C:\Users\nicolas\Desktop\Sistemas Operativos\Project1OS\datasets"
