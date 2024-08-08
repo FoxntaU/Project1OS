@@ -175,9 +175,10 @@ def save_to_csv(mode, start_time_program, end_time_program, file_paths, start_ti
     df["Tiempo total del proceso (s)"] = f"{(end_time_program - start_time_program).total_seconds():.6f}"
 
     # Guardar el DataFrame en un archivo CSV
-    output_file = f"{mode}_summary.csv"
+    output_file = f"{mode}_summary_{end_time_program.strftime('%H%M%S')}.csv"
     df.to_csv(output_file, index=False)
     print(f"\n[bold green]Resumen guardado en:[/bold green] {output_file}\n")
+    
 
     
 def main():
