@@ -117,7 +117,7 @@ def read_files_in_multi_core(file_paths):
     save_to_csv("multi_core", start_time_program, end_time_program, file_paths, start_times, end_times, durations)
 
 
-def mostrar_informacion_sistema():
+def show_info_sys():
     print(f"[bold cyan]Tipo de procesador:[/bold cyan] {platform.processor()}")
     print(f"[bold cyan]Cantidad de memoria RAM:[/bold cyan] {psutil.virtual_memory().total / (1024 ** 3):.2f} GB")
     print(f"[bold cyan]Sistema operativo:[/bold cyan] {platform.system()} {platform.release()}")
@@ -127,7 +127,7 @@ def mostrar_informacion_sistema():
 def print_end(mode, start_time_program, end_time_program, file_paths, start_times, end_times, durations):
     print("\n")
     print("[bold]Información del sistema[/bold]")
-    mostrar_informacion_sistema()
+    show_info_sys()
     table = Table(title="Resumen de carga de archivos")
     table.add_column("Archivo", justify="left", style="cyan", no_wrap=True)
     table.add_column("Hora de inicio", style="magenta")
