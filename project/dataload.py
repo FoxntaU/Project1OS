@@ -9,12 +9,11 @@ import multiprocessing
 import psutil
 import platform
 
-def worker_wrapper(file_path):
-    return read_files(file_path)
 
 def read_files(file_path):
     start_time = datetime.now()
-    pid = os.getpid()  # Obtener el PID del proceso actual
+    pid = os.getpid()
+
     try:
         data = pd.read_csv(file_path, encoding='latin1')
     except pd.errors.EmptyDataError:
@@ -22,9 +21,7 @@ def read_files(file_path):
     end_time = datetime.now()
     duration = (end_time - start_time).total_seconds()
 
-    # Obtener el uso de memoria virtual del proceso
-    memory_virtual = psutil.Process(pid).memory_info().vms  # VMS (Virtual Memory Size) en bytes
-
+    memory_virtual = psutil.Process(pid).memory_info().vms  
     return data, start_time, end_time, duration, pid, memory_virtual
 
 def read_files_sequentially(file_paths):
@@ -63,21 +60,10 @@ def check_cpu_affinity():
 def read_files_in_same_core(file_paths):
     print(f"\nLeyendo los archivos en [bold cyan] same core [/bold cyan] mode")
     start_time_program = datetime.now()
+    # Asignar el proceso padre a un solo core
     p = psutil.Process(os.getpid())
     p.cpu_affinity([0])
     check_cpu_affinity()
-
-    manager = multiprocessing.Manager()
-    return_dict = manager.dict()
-
-    processes = []
-    for file_path in file_paths:
-        proc = multiprocessing.Process(target=process_file, args=(file_path, return_dict))
-        processes.append(proc)
-        proc.start()
-
-    for proc in processes:
-        proc.join()
 
     data_list = []
     start_times = []
@@ -85,9 +71,16 @@ def read_files_in_same_core(file_paths):
     durations = []
     pids = []
     memory_virtuals = []
+    
+    with multiprocessing.Pool() as pool:
+        worker_pool = pool._pool # Obtener la lista de workers
+        for worker in worker_pool: # Asignar cada worker a un solo core
+            print(f"Asignando worker {worker.pid} al core 0")
+            psutil.Process(worker.pid).cpu_affinity([0])
+        
+        results = pool.map(read_files, file_paths)
 
-    for file_path in file_paths:
-        data, start_time, end_time, duration, pid, memory_virtual = return_dict[file_path]
+    for i, (data, start_time, end_time, duration, pid, memory_virtual) in enumerate(results):
         if data is not None:
             data_list.append(data)
         start_times.append(start_time)
@@ -100,10 +93,6 @@ def read_files_in_same_core(file_paths):
     
     print_end("same core", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals)
     save_to_csv("same_core", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals)
-
-def process_file(file_path, return_dict):
-    result = read_files(file_path)
-    return_dict[file_path] = result
 
 def read_files_in_multi_core(file_paths):
     print(f"\nLeyendo los archivos en [bold cyan] multi core [/bold cyan] mode")
@@ -120,7 +109,7 @@ def read_files_in_multi_core(file_paths):
     memory_virtuals = []
 
     with multiprocessing.Pool() as pool:
-        results = pool.map(worker_wrapper, file_paths)
+        results = pool.map(read_files, file_paths)
 
     for result in results:
         data, start_time, end_time, duration, pid, memory_virtual = result
@@ -154,7 +143,7 @@ def print_end(mode, start_time_program, end_time_program, file_paths, start_time
     table.add_column("Hora de inicio", style="magenta")
     table.add_column("Hora de finalización", style="magenta")
     table.add_column("Duración (s)", style="green")
-    table.add_column("Memoria Virtual (bytes)", style="red")  # Nueva columna para uso de memoria virtual
+    table.add_column("Memoria Virtual (bytes)", style="red") 
 
     for i, file_path in enumerate(file_paths):
         table.add_row(
@@ -163,7 +152,7 @@ def print_end(mode, start_time_program, end_time_program, file_paths, start_time
             start_times[i].strftime("%H:%M:%S.%f"),
             end_times[i].strftime("%H:%M:%S.%f"),
             f"{durations[i]:.6f}",
-            f"{memory_virtuals[i]:,}"  # Formato con comas para separar miles
+            f"{memory_virtuals[i]:,}" 
         )
 
     start_time_str = start_times[0].strftime("%H:%M:%S.%f")
