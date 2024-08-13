@@ -9,7 +9,6 @@ import multiprocessing
 import psutil
 import platform
 
-
 def worker_wrapper(file_path):
     return read_files(file_path)
 
@@ -22,7 +21,11 @@ def read_files(file_path):
         data = None
     end_time = datetime.now()
     duration = (end_time - start_time).total_seconds()
-    return data, start_time, end_time, duration, pid
+
+    # Obtener el uso de memoria virtual del proceso
+    memory_virtual = psutil.Process(pid).memory_info().vms  # VMS (Virtual Memory Size) en bytes
+
+    return data, start_time, end_time, duration, pid, memory_virtual
 
 def read_files_sequentially(file_paths):
     print(f"\nLeyendo los archivos en [bold cyan] sequentially [/bold cyan] mode")
@@ -33,22 +36,24 @@ def read_files_sequentially(file_paths):
     start_times = []
     end_times = []
     pids = []
-    
+    memory_virtuals = []
+
     for file_path in file_paths:
-        data, start_time, end_time, duration, pid = read_files(file_path)
+        data, start_time, end_time, duration, pid, memory_virtual = read_files(file_path)
         if data is not None:
             data_list.append(data)
             start_times.append(start_time)
             end_times.append(end_time)
             durations.append(duration)
             pids.append(pid)
+            memory_virtuals.append(memory_virtual)
         else: 
             print(f"[bold red]Error:[/bold red] El archivo {file_path} no pudo ser leído.")
         
     end_time_program = datetime.now()
     
-    print_end("sequentially", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids)
-    save_to_csv("sequentially", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids)
+    print_end("sequentially", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals)
+    save_to_csv("sequentially", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals)
 
 def check_cpu_affinity():
     p = psutil.Process(os.getpid())
@@ -67,33 +72,38 @@ def read_files_in_same_core(file_paths):
 
     processes = []
     for file_path in file_paths:
-        p = multiprocessing.Process(target=process_file, args=(file_path, return_dict))
-        processes.append(p)
-        p.start()
+        proc = multiprocessing.Process(target=process_file, args=(file_path, return_dict))
+        processes.append(proc)
+        proc.start()
 
-    for p in processes:
-        p.join()
+    for proc in processes:
+        proc.join()
 
     data_list = []
     start_times = []
     end_times = []
     durations = []
     pids = []
+    memory_virtuals = []
 
     for file_path in file_paths:
-        data, start_time, end_time, duration, pid = return_dict[file_path]
+        data, start_time, end_time, duration, pid, memory_virtual = return_dict[file_path]
         if data is not None:
             data_list.append(data)
         start_times.append(start_time)
         end_times.append(end_time)
         durations.append(duration)
         pids.append(pid)
+        memory_virtuals.append(memory_virtual)
 
     end_time_program = datetime.now()
+    
+    print_end("same core", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals)
+    save_to_csv("same_core", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals)
 
-    print_end("same core", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids)
-    save_to_csv("same_core", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids)
-
+def process_file(file_path, return_dict):
+    result = read_files(file_path)
+    return_dict[file_path] = result
 
 def read_files_in_multi_core(file_paths):
     print(f"\nLeyendo los archivos en [bold cyan] multi core [/bold cyan] mode")
@@ -107,35 +117,34 @@ def read_files_in_multi_core(file_paths):
     start_times = []
     end_times = []
     pids = []
+    memory_virtuals = []
 
     with multiprocessing.Pool() as pool:
         results = pool.map(worker_wrapper, file_paths)
 
     for result in results:
-        data, start_time, end_time, duration, pid = result
+        data, start_time, end_time, duration, pid, memory_virtual = result
         if data is not None:
             data_list.append(data)
         start_times.append(start_time)
         end_times.append(end_time)
         durations.append(duration)
         pids.append(pid)
+        memory_virtuals.append(memory_virtual)
 
     end_time_program = datetime.now()
 
-    print_end("multi core", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids)
-    save_to_csv("multi_core", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids)
-
-def process_file(file_path, return_dict):
-    return_dict[file_path] = read_files(file_path)
+    print_end("multi core", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals)
+    save_to_csv("multi_core", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals)
 
 def show_info_sys():
     print(f"[bold cyan]Tipo de procesador:[/bold cyan] {platform.processor()}")
     print(f"[bold cyan]Cantidad de memoria RAM:[/bold cyan] {psutil.virtual_memory().total / (1024 ** 3):.2f} GB")
-    print(f"[bold cyan]Numero total de paginas (4 KB):[/bold cyan] {psutil.virtual_memory().total / 2**12:.2f}") #aca estaa!!!!!
+    print(f"[bold cyan]Numero total de paginas (4 KB):[/bold cyan] {psutil.virtual_memory().total / 2**12:.2f}")
     print(f"[bold cyan]Sistema operativo:[/bold cyan] {platform.system()} {platform.release()}")
     print(f"[bold cyan]Numero de CPUs:[/bold cyan] {multiprocessing.cpu_count()}")
 
-def print_end(mode, start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids):
+def print_end(mode, start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals):
     print("\n")
     print("[bold]Información del sistema[/bold]")
     show_info_sys()
@@ -145,6 +154,7 @@ def print_end(mode, start_time_program, end_time_program, file_paths, start_time
     table.add_column("Hora de inicio", style="magenta")
     table.add_column("Hora de finalización", style="magenta")
     table.add_column("Duración (s)", style="green")
+    table.add_column("Memoria Virtual (bytes)", style="red")  # Nueva columna para uso de memoria virtual
 
     for i, file_path in enumerate(file_paths):
         table.add_row(
@@ -152,7 +162,8 @@ def print_end(mode, start_time_program, end_time_program, file_paths, start_time
             str(pids[i]),
             start_times[i].strftime("%H:%M:%S.%f"),
             end_times[i].strftime("%H:%M:%S.%f"),
-            f"{durations[i]:.6f}"
+            f"{durations[i]:.6f}",
+            f"{memory_virtuals[i]:,}"  # Formato con comas para separar miles
         )
 
     start_time_str = start_times[0].strftime("%H:%M:%S.%f")
@@ -168,13 +179,14 @@ def print_end(mode, start_time_program, end_time_program, file_paths, start_time
     print(table)
     print(f"[bold green]Tiempo total del proceso:[/bold green] {duration_total_str} segundos")
 
-def save_to_csv(mode, start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids):
+def save_to_csv(mode, start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals):
     data = {
         "Archivo": [os.path.basename(fp) for fp in file_paths],
         "PID": pids,
         "Hora de inicio": [st.strftime("%H:%M:%S.%f") for st in start_times],
         "Hora de finalización": [et.strftime("%H:%M:%S.%f") for et in end_times],
-        "Duración (s)": [f"{duration:.6f}" for duration in durations]
+        "Duración (s)": [f"{duration:.6f}" for duration in durations],
+        "Memoria Virtual (bytes)": memory_virtuals  # Agregar uso de memoria virtual al CSV
     }
     df = pd.DataFrame(data)
     df["Modo"] = mode
