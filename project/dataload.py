@@ -129,6 +129,7 @@ def read_files_in_multi_core(file_paths):
 def show_info_sys():
     print(f"[bold cyan]Tipo de procesador:[/bold cyan] {platform.processor()}")
     print(f"[bold cyan]Cantidad de memoria RAM:[/bold cyan] {psutil.virtual_memory().total / (1024 ** 3):.2f} GB")
+    print(f"[bold cyan]Cantidad de memoria swap:[/bold cyan] {psutil.swap_memory().total / (1024 ** 3):.2f} GB")
     print(f"[bold cyan]Numero total de paginas (4 KB):[/bold cyan] {psutil.virtual_memory().total / 2**12:.2f}")
     print(f"[bold cyan]Sistema operativo:[/bold cyan] {platform.system()} {platform.release()}")
     print(f"[bold cyan]Numero de CPUs:[/bold cyan] {multiprocessing.cpu_count()}")
