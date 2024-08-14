@@ -25,8 +25,6 @@ def read_files(file_path):
 
     rss_memory=psutil.Process(pid).memory_info().rss
 
-    print(rss_memory)
-    
     return data, start_time, end_time, duration, pid, memory_virtual, rss_memory
 
 def read_files_sequentially(file_paths):
@@ -39,6 +37,7 @@ def read_files_sequentially(file_paths):
     end_times = []
     pids = []
     memory_virtuals = []
+    memory_rss =[]
 
     for file_path in file_paths:
         data, start_time, end_time, duration, pid, memory_virtual, rss_memory  = read_files(file_path)
@@ -49,6 +48,7 @@ def read_files_sequentially(file_paths):
             durations.append(duration)
             pids.append(pid)
             memory_virtuals.append(memory_virtual)
+            memory_rss.append(rss_memory)
         else: 
             print(f"[bold red]Error:[/bold red] El archivo {file_path} no pudo ser leído.")
         
@@ -163,9 +163,8 @@ def print_end(mode, start_time_program, end_time_program, file_paths, start_time
             start_times[i].strftime("%H:%M:%S.%f"),
             end_times[i].strftime("%H:%M:%S.%f"),
             f"{durations[i]:.6f}",
-            f"{memory_virtuals[i]:,}"
-            f"{memory_rss[i]}"
-
+            f"{memory_virtuals[i]:,}",
+            f"{memory_rss[i]:,}"
         )
 
     start_time_str = start_times[0].strftime("%H:%M:%S.%f")
