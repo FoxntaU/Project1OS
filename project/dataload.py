@@ -8,8 +8,45 @@ import pandas as pd
 import multiprocessing
 import psutil
 import platform
+""""
+def read_files(file_path, block_size=4096):
+    data_blocks = []
+    start_time = datetime.now()
+    pid = os.getpid()
+
+    with open(file_path, 'rb') as file:
+        while True:
+            block = file.read(block_size)
+            if not block:
+                break
+            data_blocks.append(block)
+
+    end_time = datetime.now()
+    duration = (end_time - start_time).total_seconds()
+    memory_virtual = psutil.Process(pid).memory_info().vms
+    rss_memory=psutil.Process(pid).memory_info().rss
+
+    return data_blocks, start_time, end_time, duration, pid, memory_virtual, rss_memory
+"""
+
+def read_files(file_path):
+    data = None
+    start_time = datetime.now()
+    pid = os.getpid()
+
+    with open(file_path, 'rb') as file:
+        data = file.read()  # Leer todo el archivo de corrido
+
+    end_time = datetime.now()
+    duration = (end_time - start_time).total_seconds()
+    memory_virtual = psutil.Process(pid).memory_info().vms
+    rss_memory = psutil.Process(pid).memory_info().rss
+
+    return data, start_time, end_time, duration, pid, memory_virtual, rss_memory
 
 
+
+"""
 def read_files(file_path):
     start_time = datetime.now()
     pid = os.getpid()
@@ -22,10 +59,10 @@ def read_files(file_path):
     duration = (end_time - start_time).total_seconds()
 
     memory_virtual = psutil.Process(pid).memory_info().vms
-
     rss_memory=psutil.Process(pid).memory_info().rss
 
     return data, start_time, end_time, duration, pid, memory_virtual, rss_memory
+"""
 
 def read_files_sequentially(file_paths):
     print(f"\nLeyendo los archivos en [bold cyan] sequentially [/bold cyan] mode")
@@ -54,8 +91,8 @@ def read_files_sequentially(file_paths):
         
     end_time_program = datetime.now()
     
-    print_end("sequentially", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals, rss_memory )
-    save_to_csv("sequentially", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals, rss_memory)
+    print_end("sequentially", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals, memory_rss )
+    save_to_csv("sequentially", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals, memory_rss)
 
 def check_cpu_affinity():
     p = psutil.Process(os.getpid())
@@ -142,6 +179,7 @@ def show_info_sys():
     print(f"[bold cyan]Numero total de paginas (4 KB):[/bold cyan] {psutil.virtual_memory().total / 2**12:.2f}")
     print(f"[bold cyan]Sistema operativo:[/bold cyan] {platform.system()} {platform.release()}")
     print(f"[bold cyan]Numero de CPUs:[/bold cyan] {multiprocessing.cpu_count()}")
+    
 
 def print_end(mode, start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals, memory_rss):
     print("\n")
