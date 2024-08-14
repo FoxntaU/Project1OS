@@ -21,8 +21,13 @@ def read_files(file_path):
     end_time = datetime.now()
     duration = (end_time - start_time).total_seconds()
 
-    memory_virtual = psutil.Process(pid).memory_info().vms  
-    return data, start_time, end_time, duration, pid, memory_virtual
+    memory_virtual = psutil.Process(pid).memory_info().vms
+
+    rss_memory=psutil.Process(pid).memory_info().rss
+
+    print(rss_memory)
+    
+    return data, start_time, end_time, duration, pid, memory_virtual, rss_memory
 
 def read_files_sequentially(file_paths):
     print(f"\nLeyendo los archivos en [bold cyan] sequentially [/bold cyan] mode")
@@ -36,7 +41,7 @@ def read_files_sequentially(file_paths):
     memory_virtuals = []
 
     for file_path in file_paths:
-        data, start_time, end_time, duration, pid, memory_virtual = read_files(file_path)
+        data, start_time, end_time, duration, pid, memory_virtual, rss_memory  = read_files(file_path)
         if data is not None:
             data_list.append(data)
             start_times.append(start_time)
@@ -49,8 +54,8 @@ def read_files_sequentially(file_paths):
         
     end_time_program = datetime.now()
     
-    print_end("sequentially", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals)
-    save_to_csv("sequentially", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals)
+    print_end("sequentially", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals, rss_memory )
+    save_to_csv("sequentially", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals, rss_memory)
 
 def check_cpu_affinity():
     p = psutil.Process(os.getpid())
@@ -71,6 +76,7 @@ def read_files_in_same_core(file_paths):
     durations = []
     pids = []
     memory_virtuals = []
+    memory_rss =[]
     
     with multiprocessing.Pool() as pool:
         worker_pool = pool._pool # Obtener la lista de workers
@@ -80,7 +86,7 @@ def read_files_in_same_core(file_paths):
         
         results = pool.map(read_files, file_paths)
 
-    for i, (data, start_time, end_time, duration, pid, memory_virtual) in enumerate(results):
+    for i, (data, start_time, end_time, duration, pid, memory_virtual, rss_memory ) in enumerate(results):
         if data is not None:
             data_list.append(data)
         start_times.append(start_time)
@@ -88,11 +94,12 @@ def read_files_in_same_core(file_paths):
         durations.append(duration)
         pids.append(pid)
         memory_virtuals.append(memory_virtual)
+        memory_rss.append(rss_memory)
 
     end_time_program = datetime.now()
     
-    print_end("same core", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals)
-    save_to_csv("same_core", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals)
+    print_end("same core", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals, memory_rss)
+    save_to_csv("same_core", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals, memory_rss)
 
 def read_files_in_multi_core(file_paths):
     print(f"\nLeyendo los archivos en [bold cyan] multi core [/bold cyan] mode")
@@ -107,12 +114,13 @@ def read_files_in_multi_core(file_paths):
     end_times = []
     pids = []
     memory_virtuals = []
+    memory_rss =[]
 
     with multiprocessing.Pool() as pool:
         results = pool.map(read_files, file_paths)
 
     for result in results:
-        data, start_time, end_time, duration, pid, memory_virtual = result
+        data, start_time, end_time, duration, pid, memory_virtual, rss_memory  = result
         if data is not None:
             data_list.append(data)
         start_times.append(start_time)
@@ -120,11 +128,12 @@ def read_files_in_multi_core(file_paths):
         durations.append(duration)
         pids.append(pid)
         memory_virtuals.append(memory_virtual)
+        memory_rss.append(rss_memory)
 
     end_time_program = datetime.now()
 
-    print_end("multi core", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals)
-    save_to_csv("multi_core", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals)
+    print_end("multi core", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals, memory_rss)
+    save_to_csv("multi_core", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals, memory_rss)
 
 def show_info_sys():
     print(f"[bold cyan]Tipo de procesador:[/bold cyan] {platform.processor()}")
@@ -134,7 +143,7 @@ def show_info_sys():
     print(f"[bold cyan]Sistema operativo:[/bold cyan] {platform.system()} {platform.release()}")
     print(f"[bold cyan]Numero de CPUs:[/bold cyan] {multiprocessing.cpu_count()}")
 
-def print_end(mode, start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals):
+def print_end(mode, start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals, memory_rss):
     print("\n")
     print("[bold]Información del sistema[/bold]")
     show_info_sys()
@@ -145,6 +154,7 @@ def print_end(mode, start_time_program, end_time_program, file_paths, start_time
     table.add_column("Hora de finalización", style="magenta")
     table.add_column("Duración (s)", style="green")
     table.add_column("Memoria Virtual (bytes)", style="red") 
+    table.add_column("Memoria RRS (bytes)", style="red") 
 
     for i, file_path in enumerate(file_paths):
         table.add_row(
@@ -153,7 +163,9 @@ def print_end(mode, start_time_program, end_time_program, file_paths, start_time
             start_times[i].strftime("%H:%M:%S.%f"),
             end_times[i].strftime("%H:%M:%S.%f"),
             f"{durations[i]:.6f}",
-            f"{memory_virtuals[i]:,}" 
+            f"{memory_virtuals[i]:,}"
+            f"{memory_rss[i]}"
+
         )
 
     start_time_str = start_times[0].strftime("%H:%M:%S.%f")
@@ -169,14 +181,15 @@ def print_end(mode, start_time_program, end_time_program, file_paths, start_time
     print(table)
     print(f"[bold green]Tiempo total del proceso:[/bold green] {duration_total_str} segundos")
 
-def save_to_csv(mode, start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals):
+def save_to_csv(mode, start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals, memory_rss):
     data = {
         "Archivo": [os.path.basename(fp) for fp in file_paths],
         "PID": pids,
         "Hora de inicio": [st.strftime("%H:%M:%S.%f") for st in start_times],
         "Hora de finalización": [et.strftime("%H:%M:%S.%f") for et in end_times],
         "Duración (s)": [f"{duration:.6f}" for duration in durations],
-        "Memoria Virtual (bytes)": memory_virtuals  # Agregar uso de memoria virtual al CSV
+        "Memoria Virtual (bytes)": memory_virtuals,
+        "Memoria RSS (bytes):": memory_rss
     }
     df = pd.DataFrame(data)
     df["Modo"] = mode
