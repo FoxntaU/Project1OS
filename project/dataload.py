@@ -8,34 +8,19 @@ import pandas as pd
 import multiprocessing
 import psutil
 import platform
-""""
-def read_files(file_path, block_size=4096):
-    data_blocks = []
-    start_time = datetime.now()
-    pid = os.getpid()
+import mmap
 
-    with open(file_path, 'rb') as file:
-        while True:
-            block = file.read(block_size)
-            if not block:
-                break
-            data_blocks.append(block)
-
-    end_time = datetime.now()
-    duration = (end_time - start_time).total_seconds()
-    memory_virtual = psutil.Process(pid).memory_info().vms
-    rss_memory=psutil.Process(pid).memory_info().rss
-
-    return data_blocks, start_time, end_time, duration, pid, memory_virtual, rss_memory
 """
-
-def read_files(file_path):
-    data = None
+#LECTURA PANDAS
+def read_files(file_path, block_size=4096):
     start_time = datetime.now()
     pid = os.getpid()
 
-    with open(file_path, 'rb') as file:
-        data = file.read()  # Leer todo el archivo de corrido
+    try:
+        chunks = pd.read_csv(file_path, encoding='latin1', chunksize=block_size)
+        data = pd.concat(chunks, ignore_index=True)
+    except pd.errors.EmptyDataError:
+        data = pd.DataFrame()  # Devuelve un DataFrame vacío en caso de error
 
     end_time = datetime.now()
     duration = (end_time - start_time).total_seconds()
@@ -43,58 +28,47 @@ def read_files(file_path):
     rss_memory = psutil.Process(pid).memory_info().rss
 
     return data, start_time, end_time, duration, pid, memory_virtual, rss_memory
-
-
-
 """
+
 def read_files(file_path):
+
+    data_blocks = []
     start_time = datetime.now()
     pid = os.getpid()
 
-    try:
-        data = pd.read_csv(file_path, encoding='latin1')
-    except pd.errors.EmptyDataError:
-        data = None
+    with open(file_path, "r") as f:
+        # Mapear el archivo completo a memoria
+        m = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+
+        # Leer el archivo en bloques de 4KB
+        bloque_tamano = 4096
+        while True:
+            bloque = m.read(bloque_tamano)
+            if not bloque:
+                break
+            data_blocks.append(bloque)
+
     end_time = datetime.now()
     duration = (end_time - start_time).total_seconds()
-
     memory_virtual = psutil.Process(pid).memory_info().vms
-    rss_memory=psutil.Process(pid).memory_info().rss
+    rss_memory = psutil.Process(pid).memory_info().rss
 
-    return data, start_time, end_time, duration, pid, memory_virtual, rss_memory
-"""
+    return data_blocks, start_time, end_time, duration, pid, memory_virtual, rss_memory
 
 def read_files_sequentially(file_paths):
     print(f"\nLeyendo los archivos en [bold cyan] sequentially [/bold cyan] mode")
     start_time_program = datetime.now()
 
     data_list = []
+    durations = []
     start_times = []
     end_times = []
-    durations = []
     pids = []
     memory_virtuals = []
-    memory_rss = []
+    memory_rss =[]
 
-    pid = os.getpid()
-    
     for file_path in file_paths:
-        start_time = datetime.now()
-        
-        # Espera hasta que el archivo esté listo en la cola
-        prefetch_result = prefetch_queue.get()
-        
-        if prefetch_result is None:
-            break
-        
-        file_path, data = prefetch_result
-        
-        end_time = datetime.now()
-        duration = (end_time - start_time).total_seconds()
-
-        memory_virtual = psutil.Process(pid).memory_info().vms
-        rss_memory = psutil.Process(pid).memory_info().rss
-
+        data, start_time, end_time, duration, pid, memory_virtual, rss_memory  = read_files(file_path)
         if data is not None:
             data_list.append(data)
             start_times.append(start_time)
@@ -103,71 +77,92 @@ def read_files_sequentially(file_paths):
             pids.append(pid)
             memory_virtuals.append(memory_virtual)
             memory_rss.append(rss_memory)
-        else:
+        else: 
             print(f"[bold red]Error:[/bold red] El archivo {file_path} no pudo ser leído.")
-
-    stop_event.set()
-    prefetch_thread.join()
-
-    return data_list, start_times, end_times, durations, pids, memory_virtuals, memory_rss
-
-# Función para leer archivos de forma secuencial con prefetching
-def read_files_sequentially(file_paths):
-    print(f"\nLeyendo los archivos en [bold cyan] sequentially [/bold cyan] mode")
-    start_time_program = datetime.now()  # Marca el inicio del proceso secuencial.
-
-    # Usar la función optimizada con prefetching
-    data_list, start_times, end_times, durations, pids, memory_virtuals, memory_rss = read_files_with_prefetching(file_paths)
-
-    end_time_program = datetime.now()  # Marca el final del proceso secuencial.
+        
+    end_time_program = datetime.now()
     
-    # Muestra y guarda los resultados en un archivo CSV.
-    print_end("sequentially", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals, memory_rss)
+    print_end("sequentially", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals, memory_rss )
     save_to_csv("sequentially", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals, memory_rss)
 
-# Función para verificar la afinidad del proceso con las CPUs
 def check_cpu_affinity():
     p = psutil.Process(os.getpid())
     affinity = p.cpu_affinity()
     print(f"El proceso está asignado a los núcleos: {affinity}")
 
-# Función para leer archivos utilizando un solo núcleo de CPU
 def read_files_in_same_core(file_paths):
     print(f"\nLeyendo los archivos en [bold cyan] same core [/bold cyan] mode")
-    start_time_program = datetime.now()  # Marca el inicio del proceso.
-
+    start_time_program = datetime.now()
+    # Asignar el proceso padre a un solo core
     p = psutil.Process(os.getpid())
-    p.cpu_affinity([0])  # Asigna el proceso padre al núcleo 0.
+    p.cpu_affinity([0])
     check_cpu_affinity()
 
-    # Usar la función optimizada con prefetching
-    data_list, start_times, end_times, durations, pids, memory_virtuals, memory_rss = read_files_with_prefetching(file_paths)
-
-    end_time_program = datetime.now()  # Marca el final del proceso.
+    data_list = []
+    start_times = []
+    end_times = []
+    durations = []
+    pids = []
+    memory_virtuals = []
+    memory_rss =[]
     
-    # Muestra y guarda los resultados en un archivo CSV.
+    with multiprocessing.Pool() as pool:
+        worker_pool = pool._pool # Obtener la lista de workers
+        for worker in worker_pool: # Asignar cada worker a un solo core
+            print(f"Asignando worker {worker.pid} al core 0")
+            psutil.Process(worker.pid).cpu_affinity([0])
+        
+        results = pool.map(read_files, file_paths)
+
+    for i, (data, start_time, end_time, duration, pid, memory_virtual, rss_memory ) in enumerate(results):
+        if data is not None:
+            data_list.append(data)
+        start_times.append(start_time)
+        end_times.append(end_time)
+        durations.append(duration)
+        pids.append(pid)
+        memory_virtuals.append(memory_virtual)
+        memory_rss.append(rss_memory)
+
+    end_time_program = datetime.now()
+    
     print_end("same core", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals, memory_rss)
     save_to_csv("same_core", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals, memory_rss)
 
-# Función para leer archivos utilizando múltiples núcleos de CPU
 def read_files_in_multi_core(file_paths):
     print(f"\nLeyendo los archivos en [bold cyan] multi core [/bold cyan] mode")
-    start_time_program = datetime.now()  # Marca el inicio del proceso.
-
+    start_time_program = datetime.now()
     p = psutil.Process(os.getpid())
-    p.cpu_affinity(list(range(psutil.cpu_count())))  # Asigna el proceso a todos los núcleos disponibles.
+    p.cpu_affinity(list(range(psutil.cpu_count()))) 
     check_cpu_affinity()
 
-    # Usar la función optimizada con prefetching
-    data_list, start_times, end_times, durations, pids, memory_virtuals, memory_rss = read_files_with_prefetching(file_paths)
+    data_list = []
+    durations = []
+    start_times = []
+    end_times = []
+    pids = []
+    memory_virtuals = []
+    memory_rss =[]
 
-    end_time_program = datetime.now()  # Marca el final del proceso.
+    with multiprocessing.Pool() as pool:
+        results = pool.map(read_files, file_paths)
 
-    # Muestra y guarda los resultados en un archivo CSV.
+    for result in results:
+        data, start_time, end_time, duration, pid, memory_virtual, rss_memory  = result
+        if data is not None:
+            data_list.append(data)
+        start_times.append(start_time)
+        end_times.append(end_time)
+        durations.append(duration)
+        pids.append(pid)
+        memory_virtuals.append(memory_virtual)
+        memory_rss.append(rss_memory)
+
+    end_time_program = datetime.now()
+
     print_end("multi core", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals, memory_rss)
     save_to_csv("multi_core", start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals, memory_rss)
 
-# Función para mostrar la información del sistema
 def show_info_sys():
     print(f"[bold cyan]Tipo de procesador:[/bold cyan] {platform.processor()}")
     print(f"[bold cyan]Cantidad de memoria RAM:[/bold cyan] {psutil.virtual_memory().total / (1024 ** 3):.2f} GB")
@@ -175,14 +170,12 @@ def show_info_sys():
     print(f"[bold cyan]Numero total de paginas (4 KB):[/bold cyan] {psutil.virtual_memory().total / 2**12:.2f}")
     print(f"[bold cyan]Sistema operativo:[/bold cyan] {platform.system()} {platform.release()}")
     print(f"[bold cyan]Numero de CPUs:[/bold cyan] {multiprocessing.cpu_count()}")
+    
 
-# Función para imprimir un resumen de los resultados
 def print_end(mode, start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals, memory_rss):
     print("\n")
     print("[bold]Información del sistema[/bold]")
     show_info_sys()
-
-    # Crea una tabla para mostrar el resumen de la carga de archivos.
     table = Table(title="Resumen de carga de archivos")
     table.add_column("Archivo", justify="left", style="cyan", no_wrap=True)
     table.add_column("PID", style="yellow")
@@ -190,9 +183,8 @@ def print_end(mode, start_time_program, end_time_program, file_paths, start_time
     table.add_column("Hora de finalización", style="magenta")
     table.add_column("Duración (s)", style="green")
     table.add_column("Memoria Virtual (bytes)", style="red") 
-    table.add_column("Memoria RSS (bytes)", style="red") 
+    table.add_column("Memoria RRS (bytes)", style="red") 
 
-    # Añade una fila por cada archivo leído.
     for i, file_path in enumerate(file_paths):
         table.add_row(
             os.path.basename(file_path),
@@ -204,7 +196,6 @@ def print_end(mode, start_time_program, end_time_program, file_paths, start_time
             f"{memory_rss[i]:,}"
         )
 
-    # Calcula y muestra la duración total del proceso.
     start_time_str = start_times[0].strftime("%H:%M:%S.%f")
     end_time_str = end_times[-1].strftime("%H:%M:%S.%f")
     duration_total = (end_time_program - start_time_program).total_seconds()
@@ -218,9 +209,7 @@ def print_end(mode, start_time_program, end_time_program, file_paths, start_time
     print(table)
     print(f"[bold green]Tiempo total del proceso:[/bold green] {duration_total_str} segundos")
 
-# Función para guardar el resumen en un archivo CSV
 def save_to_csv(mode, start_time_program, end_time_program, file_paths, start_times, end_times, durations, pids, memory_virtuals, memory_rss):
-    # Crea un diccionario con los datos a guardar.
     data = {
         "Archivo": [os.path.basename(fp) for fp in file_paths],
         "PID": pids,
@@ -230,8 +219,6 @@ def save_to_csv(mode, start_time_program, end_time_program, file_paths, start_ti
         "Memoria Virtual (bytes)": memory_virtuals,
         "Memoria RSS (bytes):": memory_rss
     }
-
-    # Crea un DataFrame con los datos.
     df = pd.DataFrame(data)
     df["Modo"] = mode
     df["Hora de inicio del programa"] = start_time_program.strftime("%H:%M:%S.%f")
@@ -239,8 +226,6 @@ def save_to_csv(mode, start_time_program, end_time_program, file_paths, start_ti
     df["Hora de finalización de la carga del último archivo"] = end_times[-1].strftime("%H:%M:%S.%f")
     df["Hora de finalización del programa"] = end_time_program.strftime("%H:%M:%S.%f")
     df["Tiempo total del proceso (s)"] = f"{(end_time_program - start_time_program).total_seconds():.6f}"
-
-    # Guarda el DataFrame en un archivo CSV.
     output_file = f"{mode}_summary_{end_time_program.strftime('%H%M%S')}.csv"
     df.to_csv(output_file, index=False)
     print(f"\n[bold green]Resumen guardado en:[/bold green] {output_file}\n")
