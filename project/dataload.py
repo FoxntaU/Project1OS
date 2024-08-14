@@ -8,34 +8,19 @@ import pandas as pd
 import multiprocessing
 import psutil
 import platform
-""""
-def read_files(file_path, block_size=4096):
-    data_blocks = []
-    start_time = datetime.now()
-    pid = os.getpid()
+import mmap
 
-    with open(file_path, 'rb') as file:
-        while True:
-            block = file.read(block_size)
-            if not block:
-                break
-            data_blocks.append(block)
-
-    end_time = datetime.now()
-    duration = (end_time - start_time).total_seconds()
-    memory_virtual = psutil.Process(pid).memory_info().vms
-    rss_memory=psutil.Process(pid).memory_info().rss
-
-    return data_blocks, start_time, end_time, duration, pid, memory_virtual, rss_memory
 """
-
-def read_files(file_path):
-    data = None
+#LECTURA PANDAS
+def read_files(file_path, block_size=4096):
     start_time = datetime.now()
     pid = os.getpid()
 
-    with open(file_path, 'rb') as file:
-        data = file.read()  # Leer todo el archivo de corrido
+    try:
+        chunks = pd.read_csv(file_path, encoding='latin1', chunksize=block_size)
+        data = pd.concat(chunks, ignore_index=True)
+    except pd.errors.EmptyDataError:
+        data = pd.DataFrame()  # Devuelve un DataFrame vacío en caso de error
 
     end_time = datetime.now()
     duration = (end_time - start_time).total_seconds()
@@ -43,26 +28,32 @@ def read_files(file_path):
     rss_memory = psutil.Process(pid).memory_info().rss
 
     return data, start_time, end_time, duration, pid, memory_virtual, rss_memory
-
-
-
 """
+
 def read_files(file_path):
+
+    data_blocks = []
     start_time = datetime.now()
     pid = os.getpid()
 
-    try:
-        data = pd.read_csv(file_path, encoding='latin1')
-    except pd.errors.EmptyDataError:
-        data = None
+    with open(file_path, "r") as f:
+        # Mapear el archivo completo a memoria
+        m = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+
+        # Leer el archivo en bloques de 4KB
+        bloque_tamano = 4096
+        while True:
+            bloque = m.read(bloque_tamano)
+            if not bloque:
+                break
+            data_blocks.append(bloque)
+
     end_time = datetime.now()
     duration = (end_time - start_time).total_seconds()
-
     memory_virtual = psutil.Process(pid).memory_info().vms
-    rss_memory=psutil.Process(pid).memory_info().rss
+    rss_memory = psutil.Process(pid).memory_info().rss
 
-    return data, start_time, end_time, duration, pid, memory_virtual, rss_memory
-"""
+    return data_blocks, start_time, end_time, duration, pid, memory_virtual, rss_memory
 
 def read_files_sequentially(file_paths):
     print(f"\nLeyendo los archivos en [bold cyan] sequentially [/bold cyan] mode")
